@@ -7,7 +7,7 @@ import joblib
 # ---------------------------
 @st.cache_resource
 def load_model():
-    return joblib.load("models/churn_xgb_model.pkl")
+    return joblib.load("churn_xgb_model.pkl")
 
 model = load_model()
 
@@ -15,11 +15,11 @@ model = load_model()
 # Preprocess function (cached)
 # ---------------------------
 @st.cache_data
-def preprocess_input(input_df, model):
+def preprocess_input(input_df, feature_names):
     # One-hot encode categorical variables
     input_df = pd.get_dummies(input_df)
     # Reindex to ensure all model features are present
-    input_df = input_df.reindex(columns=model.get_booster().feature_names, fill_value=0)
+    input_df = input_df.reindex(columns=feature_names, fill_value=0)
     return input_df
 
 # ---------------------------
@@ -29,7 +29,7 @@ st.title("📊 IBM Customer Churn Prediction")
 
 st.write("Enter customer details below to predict churn:")
 
-# Example input fields (add more features as needed)
+# Example input fields (add more later)
 gender = st.selectbox("Gender", ["Male", "Female"])
 senior = st.selectbox("Senior Citizen", ["Yes", "No"])
 partner = st.selectbox("Partner", ["Yes", "No"])
@@ -54,7 +54,8 @@ input_df = pd.DataFrame({
 # ---------------------------
 if st.button("Predict"):
     with st.spinner("⏳ Making prediction..."):
-        processed = preprocess_input(input_df, model)
+        feature_names = model.get_booster().feature_names
+        processed = preprocess_input(input_df, feature_names)
         pred = model.predict(processed)[0]
         prob = model.predict_proba(processed)[0][1]
 
