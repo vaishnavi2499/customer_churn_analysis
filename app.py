@@ -7,7 +7,7 @@ import joblib
 # ---------------------------
 @st.cache_resource
 def load_model():
-    return joblib.load("churn_xgb_model.pkl")
+    return joblib.load("models/churn_xgb_model.pkl")
 
 model = load_model()
 
