@@ -2,55 +2,48 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# --- Load saved model, scaler and feature columns ---
-xgb_model = joblib.load("models/xgb_churn_model.pkl")
-scaler = joblib.load("models/scaler.pkl")
-feature_columns = joblib.load("models/feature_columns.pkl")
+# Load model
+model = joblib.load("churn_xgb_model.pkl")
 
-st.title("📊 Customer Churn Prediction")
+st.title("📊 IBM Customer Churn Prediction")
 
-st.write("Enter customer details to predict churn probability:")
+st.write("Enter customer details below to predict churn:")
 
-# --- Input fields ---
-tenure = st.number_input("Tenure (months)", min_value=0, max_value=100, value=12)
-monthly_charges = st.number_input("Monthly Charges", min_value=0.0, max_value=1000.0, value=70.0)
-total_charges = st.number_input("Total Charges", min_value=0.0, max_value=10000.0, value=840.0)
-
-# Example categorical inputs (adjust based on your dataset)
+# Collect inputs
 gender = st.selectbox("Gender", ["Male", "Female"])
-partner = st.selectbox("Has Partner?", ["Yes", "No"])
-dependents = st.selectbox("Has Dependents?", ["Yes", "No"])
-contract = st.selectbox("Contract Type", ["Month-to-month", "One year", "Two year"])
-payment_method = st.selectbox("Payment Method", ["Electronic check", "Mailed check", "Bank transfer", "Credit card"])
+senior = st.selectbox("Senior Citizen", ["Yes", "No"])
+partner = st.selectbox("Partner", ["Yes", "No"])
+dependents = st.selectbox("Dependents", ["Yes", "No"])
+tenure = st.number_input("Tenure (months)", min_value=0, max_value=100)
+monthly_charges = st.number_input("Monthly Charges", min_value=0.0)
+total_charges = st.number_input("Total Charges", min_value=0.0)
 
-# --- Preprocess input ---
+# Convert to dataframe (match preprocessing)
 input_df = pd.DataFrame({
-    'tenure':[tenure],
-    'MonthlyCharges':[monthly_charges],
-    'TotalCharges':[total_charges],
-    'avg_charges_per_month':[total_charges / max(tenure,1)],
-
-    # Example one-hot encodings (must match training!)
-    'gender_Female':[1 if gender=="Female" else 0],
-    'Partner_Yes':[1 if partner=="Yes" else 0],
-    'Dependents_Yes':[1 if dependents=="Yes" else 0],
-    'Contract_One year':[1 if contract=="One year" else 0],
-    'Contract_Two year':[1 if contract=="Two year" else 0],
-    'PaymentMethod_Credit card (automatic)':[1 if payment_method=="Credit card" else 0],
-    'PaymentMethod_Electronic check':[1 if payment_method=="Electronic check" else 0],
-    'PaymentMethod_Mailed check':[1 if payment_method=="Mailed check" else 0]
+    "gender": [gender],
+    "SeniorCitizen": [1 if senior=="Yes" else 0],
+    "Partner": [partner],
+    "Dependents": [dependents],
+    "tenure": [tenure],
+    "MonthlyCharges": [monthly_charges],
+    "TotalCharges": [total_charges]
 })
 
-# Scale numeric columns
-num_cols = ['tenure','MonthlyCharges','TotalCharges','avg_charges_per_month']
-input_df[num_cols] = scaler.transform(input_df[num_cols])
+# Handle categorical variables (must match training encoding)
+input_df = pd.get_dummies(input_df)
+# Add missing columns (in case some categories are missing in input)
+for col in model.get_booster().feature_names:
+    if col not in input_df.columns:
+        input_df[col] = 0
 
-# Ensure correct column order + fill missing with 0
-input_df = input_df.reindex(columns=feature_columns, fill_value=0)
+# Reorder to match training features
+input_df = input_df[model.get_booster().feature_names]
 
-# --- Predict ---
-if st.button("Predict Churn"):
-    prob = xgb_model.predict_proba(input_df)[:,1][0]
-    prediction = "Yes" if prob > 0.5 else "No"
-    st.write(f"🔮 **Churn Probability:** {prob:.2f}")
-    st.write(f"📌 **Predicted Churn:** {prediction}")
+if st.button("Predict"):
+    pred = model.predict(input_df)[0]
+    prob = model.predict_proba(input_df)[0][1]
+    
+    if pred == 1:
+        st.error(f"❌ Customer is likely to CHURN (Probability: {prob:.2f})")
+    else:
+        st.success(f"✅ Customer is NOT likely to churn (Probability: {prob:.2f})")
