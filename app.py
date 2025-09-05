@@ -3,9 +3,9 @@ import pandas as pd
 import joblib
 
 # --- Load saved model, scaler and feature columns ---
-xgb_model = joblib.load("../models/xgb_churn_model.pkl")
-scaler = joblib.load("../models/scaler.pkl")
-feature_columns = joblib.load("../models/feature_columns.pkl")
+xgb_model = joblib.load("models/xgb_churn_model.pkl")
+scaler = joblib.load("models/scaler.pkl")
+feature_columns = joblib.load("models/feature_columns.pkl")
 
 st.title("📊 Customer Churn Prediction")
 
