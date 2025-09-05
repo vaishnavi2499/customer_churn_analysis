@@ -2,26 +2,46 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# Load model
-model = joblib.load("models/churn_xgb_model.pkl")
+# ---------------------------
+# Load model (cached once)
+# ---------------------------
+@st.cache_resource
+def load_model():
+    return joblib.load("models/churn_xgb_model.pkl")
 
+model = load_model()
+
+# ---------------------------
+# Preprocess function (cached)
+# ---------------------------
+@st.cache_data
+def preprocess_input(input_df, model):
+    # One-hot encode categorical variables
+    input_df = pd.get_dummies(input_df)
+    # Reindex to ensure all model features are present
+    input_df = input_df.reindex(columns=model.get_booster().feature_names, fill_value=0)
+    return input_df
+
+# ---------------------------
+# Streamlit UI
+# ---------------------------
 st.title("📊 IBM Customer Churn Prediction")
 
 st.write("Enter customer details below to predict churn:")
 
-# Collect inputs
+# Example input fields (add more features as needed)
 gender = st.selectbox("Gender", ["Male", "Female"])
 senior = st.selectbox("Senior Citizen", ["Yes", "No"])
 partner = st.selectbox("Partner", ["Yes", "No"])
 dependents = st.selectbox("Dependents", ["Yes", "No"])
-tenure = st.number_input("Tenure (months)", min_value=0, max_value=100)
-monthly_charges = st.number_input("Monthly Charges", min_value=0.0)
-total_charges = st.number_input("Total Charges", min_value=0.0)
+tenure = st.number_input("Tenure (months)", min_value=0, max_value=100, value=12)
+monthly_charges = st.number_input("Monthly Charges", min_value=0.0, value=50.0)
+total_charges = st.number_input("Total Charges", min_value=0.0, value=600.0)
 
-# Convert to dataframe (match preprocessing)
+# Create input DataFrame
 input_df = pd.DataFrame({
     "gender": [gender],
-    "SeniorCitizen": [1 if senior=="Yes" else 0],
+    "SeniorCitizen": [1 if senior == "Yes" else 0],
     "Partner": [partner],
     "Dependents": [dependents],
     "tenure": [tenure],
@@ -29,21 +49,17 @@ input_df = pd.DataFrame({
     "TotalCharges": [total_charges]
 })
 
-# Handle categorical variables (must match training encoding)
-input_df = pd.get_dummies(input_df)
-# Add missing columns (in case some categories are missing in input)
-for col in model.get_booster().feature_names:
-    if col not in input_df.columns:
-        input_df[col] = 0
-
-# Reorder to match training features
-input_df = input_df[model.get_booster().feature_names]
-
+# ---------------------------
+# Prediction
+# ---------------------------
 if st.button("Predict"):
-    pred = model.predict(input_df)[0]
-    prob = model.predict_proba(input_df)[0][1]
-    
+    with st.spinner("⏳ Making prediction..."):
+        processed = preprocess_input(input_df, model)
+        pred = model.predict(processed)[0]
+        prob = model.predict_proba(processed)[0][1]
+
+    st.subheader("🔮 Prediction Result")
     if pred == 1:
-        st.error(f"❌ Customer is likely to CHURN (Probability: {prob:.2f})")
+        st.error(f"❌ Customer is likely to **CHURN** (Probability: {prob:.2f})")
     else:
         st.success(f"✅ Customer is NOT likely to churn (Probability: {prob:.2f})")
